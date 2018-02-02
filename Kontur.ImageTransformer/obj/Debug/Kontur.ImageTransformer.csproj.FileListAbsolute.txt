@@ -1,0 +1,6 @@
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\bin\Debug\Kontur.ImageTransformer.exe.config
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\bin\Debug\Kontur.ImageTransformer.exe
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\bin\Debug\Kontur.ImageTransformer.pdb
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\obj\Debug\Kontur.ImageTransformer.csprojResolveAssemblyReference.cache
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\obj\Debug\Kontur.ImageTransformer.exe
+C:\учеба\C# MVC\SKB_KONTUR\Kontur.ImageTransformer\Kontur.ImageTransformer\obj\Debug\Kontur.ImageTransformer.pdb

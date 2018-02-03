@@ -138,8 +138,11 @@ namespace Kontur.ImageTransformer
             // obrezanie nado sna4ala sdelat'
 
             Console.WriteLine(img.PixelFormat);
-
-            var img1 = BitmapCliper.bpp_32Argb_Clip(img, 0, 0, 200, 200);
+            Console.WriteLine(urlParseResult.GetType().ToString());
+            // TODO добавить в threshold цифры 
+            // TODO обрабатывать прямоугольник картинки правильно
+            // TODO убедиться в распараллеливании и устойчивости сервера к нагрузке
+            var img1 = BitmapCliper.Clip(img, 0, 0, 250, 170, urlParseResult); 
             // tut vse ostal'noe<Filters>
 
 

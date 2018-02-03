@@ -9,15 +9,37 @@ namespace Kontur.ImageTransformer
 {
     class FilterThreshold : IFilter
     {
-        public Bitmap image { get; set; }
-        public FilterThreshold() { }
-        public FilterThreshold(Bitmap image)
+
+        public int value { get; set; }
+        
+        public FilterThreshold()
         {
-            this.image = image;
+            this.value = 0;
         }
 
-        public void draw()
+        public FilterThreshold(int value)
         {
+            this.value = value;
+        }
+
+        public void draw(ref point pnt )
+        {
+            if (pnt == null)
+                return;
+            int average = (pnt.blue + pnt.green + pnt.red) / 3;
+
+            if (average>= 255 * value / 100)
+            {
+                pnt.blue = 255;
+                pnt.green = 255;
+                pnt.red = 255;
+            }
+            else
+            {
+                pnt.blue = 0;
+                pnt.green = 0;
+                pnt.red = 0;
+            }
             
         }
     }

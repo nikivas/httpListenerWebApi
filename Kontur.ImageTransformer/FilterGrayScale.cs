@@ -16,9 +16,15 @@ namespace Kontur.ImageTransformer
             this.image = image;
         }
 
-        public void draw()
+        public void draw(ref point pnt)
         {
+            if (pnt == null)
+                return;
+            int average = (pnt.green + pnt.blue + pnt.red) / 3;
 
+            pnt.red = (byte) average;
+            pnt.blue = (byte)average;
+            pnt.green = (byte)average;
         }
 
 

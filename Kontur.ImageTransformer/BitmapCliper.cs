@@ -8,30 +8,58 @@ using System.Drawing.Imaging;
 
 namespace Kontur.ImageTransformer
 {
+    public class point
+    {
+
+        public point()
+        {
+            blue = 0;
+            alpha = 0;
+            green = 0;
+            red = 0;
+         }
+
+        public byte red { get; set; }
+
+        public byte green { get; set; }
+
+        public byte blue { get; set; }
+
+        public byte alpha { get; set; }
+
+    }
+
     class BitmapCliper
     {
-        public unsafe static Bitmap bpp_32Argb_Clip(Bitmap img, int startWidth, int startHeight, int newWidth, int newHeight, IFilter filter)
+        public unsafe static Bitmap Clip(Bitmap img, int startWidth, int startHeight, int newWidth, int newHeight, IFilter filter)
         {
-            
-            return getBitmapFromBytes_32bppArgb(clip_32bppArgb(img, startWidth, startHeight, newWidth, newHeight),filter);
+            var byteArray = getByteArray(img, startWidth, startHeight, newWidth, newHeight, filter);
+            var resultBitmap = getBitmap(byteArray);
+            return resultBitmap;
         }
 
-        private unsafe static byte[,,] clip_32bppArgb(Bitmap img, int startWidth, int startHeight, int newWidth, int newHeight)
+        private unsafe static byte[,,] getByteArray(Bitmap img, int startWidth, int startHeight, 
+                int newWidth, int newHeight, IFilter filter)
         {
             int width = newWidth;
             int height = newHeight;
-            byte[,,] res = new byte[4, height, width];
+            byte[,,] result = new byte[4, height, width];
+
+            point pixelColorCounter = new point();
+            
+
             BitmapData bd = img.LockBits(new Rectangle(0, 0, img.Width, img.Height), ImageLockMode.ReadOnly,
                 PixelFormat.Format32bppArgb);
+
             try
             {
                 byte* curpos;
-                fixed (byte* _res = res)
+                fixed (byte* resultCounter = result)
                 {
-                    byte* _r = _res;
-                    byte* _g = _res + width * height;
-                    byte* _b = _res + 2 * width * height;
-                    byte* _a = _res + 3 * width * height;
+                    byte* alphaCounter = resultCounter;
+                    byte* redCounter = resultCounter + width * height;
+                    byte* greenCounter = resultCounter + 2 * width * height;
+                    byte* blueCounter = resultCounter + 3 * width * height;
 
                     for (int h = startHeight; h < newHeight; h++)
                     {
@@ -39,12 +67,20 @@ namespace Kontur.ImageTransformer
                         curpos = ((byte*)bd.Scan0) + h * bd.Stride + startWidth;
                         for (int w = startWidth; w < newWidth; w++)
                         {
-                            *_a = *(curpos++); ++_a;
-                            *_b = *(curpos++); ++_b;
-                            *_g = *(curpos++); ++_g;
-                            *_r = *(curpos++); ++_r;
+                            pixelColorCounter.blue= *(curpos++); 
+                            pixelColorCounter.green = *(curpos++); 
+                            pixelColorCounter.red = *(curpos++);
+                            pixelColorCounter.alpha = *(curpos++); 
+
+                            if(filter != null)
+                                filter.draw(ref pixelColorCounter);
                             
-                            
+                            *blueCounter = pixelColorCounter.blue; ++blueCounter; // not alpha
+                            *greenCounter = pixelColorCounter.green; ++greenCounter; // not alpha
+                            *redCounter = pixelColorCounter.red; ++redCounter; // not alpha
+                            *alphaCounter = pixelColorCounter.alpha; ++alphaCounter; // alpha
+
+
                         }
                     }
                 }
@@ -53,11 +89,10 @@ namespace Kontur.ImageTransformer
             {
                 img.UnlockBits(bd);
             }
-            return res;
+            return result;
         }
 
-
-        private unsafe static Bitmap getBitmapFromBytes_32bppArgb(byte[,,] array, IFilter filter)
+        private unsafe static Bitmap getBitmap(byte[,,] array)
         {
             int width = array.GetLength(2),
                 height = array.GetLength(1);
@@ -75,10 +110,10 @@ namespace Kontur.ImageTransformer
                     curpos = ((byte*)bd.Scan0) + h * bd.Stride;
                     for (int w = 0; w < width; w++)
                     {
-                        *(curpos++) = array[3, h, w];
-                        *(curpos++) = array[2, h, w];
-                        *(curpos++) = array[1, h, w];
-                        *(curpos++) = array[0, h, w];
+                        *(curpos++) = array[3, h, w]; // alpha
+                        *(curpos++) = array[2, h, w]; // red
+                        *(curpos++) = array[1, h, w]; // green
+                        *(curpos++) = array[0, h, w]; // blue
                     }
                 }
             }

@@ -46,12 +46,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BitmapCliper.cs" />
+    <Compile Include="Clipers\BitmapCliper.cs" />
     <Compile Include="EntryPoint.cs" />
-    <Compile Include="FilterGrayScale.cs" />
-    <Compile Include="FilterSepia.cs" />
-    <Compile Include="FilterThreshold.cs" />
-    <Compile Include="IFilter.cs" />
+    <Compile Include="Filters\FilterGrayScale.cs" />
+    <Compile Include="Filters\FilterSepia.cs" />
+    <Compile Include="Filters\FilterThreshold.cs" />
+    <Compile Include="Filters\IFilter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AsyncHttpServer.cs" />
   </ItemGroup>

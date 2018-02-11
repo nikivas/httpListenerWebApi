@@ -32,9 +32,13 @@ namespace Kontur.ImageTransformer
     class BitmapCliper
     {
         
-
         public unsafe static Bitmap Clip(Bitmap img, int startWidth, int startHeight, int newWidth, int newHeight, IFilter filter)
         {
+            if (startWidth < 0 || startHeight < 0 || startWidth > img.Width || startHeight > img.Height)
+                return img;
+            if (startWidth + newWidth < 0 || startHeight + newHeight < 0 || startWidth + newWidth > img.Width || startHeight + newHeight > img.Height)
+                return img;
+
             int width = newWidth;
             int height = newHeight;
             byte[,,] result = new byte[4, height, width];
@@ -91,7 +95,7 @@ namespace Kontur.ImageTransformer
             return resultBitmap;
         }
         
-        public static void getCorrectCoords(ref Bitmap img, ref int coordX0, ref int coordY0, ref int coordX1, ref int coordY1)
+        public static void getCorrectCoords(ref Bitmap img, ref long coordX0, ref long coordY0, ref long coordX1, ref long coordY1)
         {
             coordY0 = Math.Max(0, coordY0);
             coordY0 = Math.Min(coordY0, img.Height);

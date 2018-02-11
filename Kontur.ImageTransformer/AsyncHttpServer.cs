@@ -110,22 +110,25 @@ namespace Kontur.ImageTransformer
 
         private IFilter urlParse(string[] url)
         {
-            if (url[1] != "process")
+            if (url[1] != @"process")
                 return null;
-            else if (!Regex.IsMatch(url[3], "^([0-9,-]*,){3}[0-9,-]*$"))
+            else if (!Regex.IsMatch(url[3], @"^([0-9,-]*,){3}[0-9,-]*$"))
                 return null;
 
-            if(url[2] == "grayscale")
+            if(url[2] == @"grayscale")
                 return new FilterGrayScale();
 
-            else if (url[2] == "sepia")
+            else if (url[2] == @"sepia")
                 return new FilterSepia();
 
-            else if (Regex.IsMatch(url[2], "^threshold/(/d{1,}/)$"))
+            else if (Regex.IsMatch(url[2], @"^threshold\(\d*\)$"))
             {
                 var el = new FilterThreshold();
-                var valueString = Regex.Match(url[2], "(/d*)").Value;
-                var valueNumber = int.Parse(valueString.Substring(1, valueString.Length - 1));
+                Console.WriteLine("in");
+                
+                var valueString = Regex.Match(url[2], @"\(\d*\)").Value;
+                Console.WriteLine(valueString);
+                var valueNumber = int.Parse(valueString.Substring(1, valueString.Length - 2));
 
                 el.value = valueNumber;
                 return el;
@@ -135,6 +138,7 @@ namespace Kontur.ImageTransformer
             return null;
         }
 
+        #region<Testing>
         private void TestHandleContextAsync(object arg)
         {
             var canceller = new CancellationTokenSource();
@@ -158,37 +162,29 @@ namespace Kontur.ImageTransformer
             }
             avalibleConnection--;
         }
+        #endregion
 
-        private void BadRequest(object arg)
+        private void BadRequest(HttpListenerContext listenerContext, int httpStatusCode)
         {
-            var listenerContext = (HttpListenerContext) arg;
-            listenerContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-            using (var writer = new StreamWriter(listenerContext.Response.OutputStream))
-            {
-                writer.Write(" ");
-            }
+            listenerContext.Response.StatusCode = httpStatusCode;
+            listenerContext.Response.Close();
+            return;
         }
 
         private async Task HandleContextAsync(HttpListenerContext listenerContext)
         {
-
-            // TODO: implement request handling
-            //var listenerContext = arg as HttpListenerContext;
-            var canceller = new CancellationTokenSource();
-            canceller.CancelAfter(maxTimeResponce);
-
+            //var canceller = new CancellationTokenSource();
+            //canceller.CancelAfter(maxTimeResponce);
             var url = listenerContext.Request.RawUrl.Split('/');
             var urlParseResult = urlParse(url);
-
             if (urlParseResult == null)
             {
-                listenerContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                listenerContext.Response.Close();
-                return;
+                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
             }
             var streamIn = listenerContext.Request.InputStream;
             var encoding = listenerContext.Request.ContentEncoding;
             var reader = new StreamReader(streamIn, encoding);
+
             Bitmap img = null;
             try { 
 
@@ -196,55 +192,56 @@ namespace Kontur.ImageTransformer
 
             }catch(Exception ee)
             {
-                Console.WriteLine("Error text not a picture");
-                listenerContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
                 return;
             }
+
             int imageWidth = img.Width;
             int imageHeight = img.Height;
-            // obrezanie nado sna4ala sdelat'
-
-            Console.WriteLine(img.PixelFormat);
-            Console.WriteLine(urlParseResult.GetType().ToString());
 
             // TODO обрабатывать прямоугольник картинки правильно
             // TODO убедиться в распараллеливании и устойчивости сервера к нагрузке
-            var coordList = url[4].Split(',');
-            int x, w, y, h;
-
-            int.TryParse(coordList[0], out x);
-            int.TryParse(coordList[1], out y);
-            int.TryParse(coordList[2], out w);
-            int.TryParse(coordList[3], out h);
-
-            int x1 = w + x;
-            int y1 = h + y;
-
-            BitmapCliper.getCorrectCoords(ref img, ref x, ref y, ref x1, ref y1);
-
-            int dy = Math.Abs(y1 - y);
-            int dx = Math.Abs(x1 - x);
-            if(dy == 0 && dx == 0)
+            
+            string[] coordList = url[3].Split(',');
+            long polygonX0 = 0;
+            long polygonWeight = 0;
+            long polygonY0 = 0;
+            long polygonHeight = 0;
+            if( !Int64.TryParse(coordList[0], out polygonX0) || !Int64.TryParse(coordList[1], out polygonY0) ||
+                !Int64.TryParse(coordList[2], out polygonWeight) || !Int64.TryParse(coordList[3], out polygonHeight))
             {
-                listenerContext.Response.StatusCode = (int)HttpStatusCode.NoContent;
+                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
             }
 
-            int x0 = Math.Min(x, x1);
-            int y0 = Math.Min(y, y1);
+            long polygonX1 = polygonWeight + polygonX0;
+            long polygonY1 = polygonHeight + polygonY0;
+            BitmapCliper.getCorrectCoords(ref img, ref polygonX0, ref polygonY0, ref polygonX1, ref polygonY1);
 
-            var img1 = BitmapCliper.Clip(img, x0, y0, dx, dy, urlParseResult); 
-            // tut vse ostal'noe<Filters>
+            long resultImageHeight = Math.Abs(polygonY1 - polygonY0);
+            long resultImageWidth = Math.Abs(polygonX1 - polygonX0);
 
+            if(resultImageHeight == 0 && resultImageWidth == 0)
+            {
+                BadRequest(listenerContext, (int)HttpStatusCode.NoContent);
+                return;
+            }
+            Int64 resultImagePointX0 = Math.Min(polygonX0, polygonX1);
+            Int64 resultImagePointY0 = Math.Min(polygonY0, polygonY1);
+            if(img.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+            {
+                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
+                return;
+            }
 
-            // </Filters>
+            
+            var resultImage = BitmapCliper.Clip(img, (int) resultImagePointX0, (int) resultImagePointY0, 
+                                                (int) resultImageWidth, (int) resultImageHeight, urlParseResult); 
 
             listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
-            //var result =  reader.ReadToEndAsync();
-
 
             using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
             {
-                img1.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
+                resultImage.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
             }
             --avalibleConnection;
         }

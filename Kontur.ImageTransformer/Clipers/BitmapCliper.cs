@@ -60,7 +60,6 @@ namespace Kontur.ImageTransformer
 
                     for (int h = startHeight; h < newHeight; h++)
                     {
-                        
                         curpos = ((byte*)bd.Scan0) + h * bd.Stride + startWidth;
                         resultBitmapPos = ((byte*)resultBitmapbytes.Scan0) + (h - startHeight)*resultBitmapbytes.Stride;
                         for (int w = startWidth; w < newWidth; w++)
@@ -78,8 +77,6 @@ namespace Kontur.ImageTransformer
                             *(resultBitmapPos++) = pixelColorCounter.green; ++greenCounter;
                             *(resultBitmapPos++) = pixelColorCounter.red; ++redCounter; 
                             *(resultBitmapPos++) = pixelColorCounter.alpha; ++alphaCounter;
-
-
                         }
                     }
                 }
@@ -94,13 +91,19 @@ namespace Kontur.ImageTransformer
             return resultBitmap;
         }
         
-        public static void getCorrectCoords(ref Bitmap img, ref int startWidth, ref int startHeight, ref int newWidth, ref int newHeight)
+        public static void getCorrectCoords(ref Bitmap img, ref int coordX0, ref int coordY0, ref int coordX1, ref int coordY1)
         {
-            startHeight = Math.Max(0, startHeight);
-            startHeight = Math.Min(startHeight, img.Height);
+            coordY0 = Math.Max(0, coordY0);
+            coordY0 = Math.Min(coordY0, img.Height);
 
-            startWidth = Math.Max(0, startWidth);
-            startWidth = Math.Min(startWidth, img.Width);
+            coordX0 = Math.Max(0, coordX0);
+            coordX0 = Math.Min(coordX0, img.Width);
+
+            coordY1 = Math.Max(0, coordY1);
+            coordY1 = Math.Min(coordY1, img.Height);
+
+            coordX1 = Math.Max(0, coordX1);
+            coordX1 = Math.Min(coordX1, img.Width);
         }
     }
 }

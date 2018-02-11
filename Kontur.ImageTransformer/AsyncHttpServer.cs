@@ -88,7 +88,7 @@ namespace Kontur.ImageTransformer
                         }
                         else
                         {
-                            avalibleConnection++;
+                            ++avalibleConnection;
                             //ThreadPool.QueueUserWorkItem(HandleContextAsync, context);
                             Task.Run(() => HandleContextAsync(context));
                         }
@@ -121,8 +121,16 @@ namespace Kontur.ImageTransformer
             else if (url[2] == "sepia")
                 return new FilterSepia();
 
-            else if (Regex.IsMatch(url[2], "^threshold/(/d*/)$"))
-                return new FilterThreshold();
+            else if (Regex.IsMatch(url[2], "^threshold/(/d{1,}/)$"))
+            {
+                var el = new FilterThreshold();
+                var valueString = Regex.Match(url[2], "(/d*)").Value;
+                var valueNumber = int.Parse(valueString.Substring(1, valueString.Length - 1));
+
+                el.value = valueNumber;
+                return el;
+            }
+                
 
             return null;
         }
@@ -175,6 +183,7 @@ namespace Kontur.ImageTransformer
             if (urlParseResult == null)
             {
                 listenerContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                listenerContext.Response.Close();
                 return;
             }
             var streamIn = listenerContext.Request.InputStream;
@@ -197,10 +206,33 @@ namespace Kontur.ImageTransformer
 
             Console.WriteLine(img.PixelFormat);
             Console.WriteLine(urlParseResult.GetType().ToString());
-            // TODO добавить в threshold цифры 
+
             // TODO обрабатывать прямоугольник картинки правильно
             // TODO убедиться в распараллеливании и устойчивости сервера к нагрузке
-            var img1 = BitmapCliper.Clip(img, 0, 0, 250, 170, urlParseResult); 
+            var coordList = url[4].Split(',');
+            int x, w, y, h;
+
+            int.TryParse(coordList[0], out x);
+            int.TryParse(coordList[1], out y);
+            int.TryParse(coordList[2], out w);
+            int.TryParse(coordList[3], out h);
+
+            int x1 = w + x;
+            int y1 = h + y;
+
+            BitmapCliper.getCorrectCoords(ref img, ref x, ref y, ref x1, ref y1);
+
+            int dy = Math.Abs(y1 - y);
+            int dx = Math.Abs(x1 - x);
+            if(dy == 0 && dx == 0)
+            {
+                listenerContext.Response.StatusCode = (int)HttpStatusCode.NoContent;
+            }
+
+            int x0 = Math.Min(x, x1);
+            int y0 = Math.Min(y, y1);
+
+            var img1 = BitmapCliper.Clip(img, x0, y0, dx, dy, urlParseResult); 
             // tut vse ostal'noe<Filters>
 
 
@@ -214,7 +246,7 @@ namespace Kontur.ImageTransformer
             {
                 img1.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
             }
-
+            --avalibleConnection;
         }
 
         private readonly HttpListener listener;

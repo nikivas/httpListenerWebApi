@@ -11,8 +11,11 @@ namespace Kontur.ImageTransformer
 
     class BitmapCliper
     {
-        public unsafe static Bitmap Clip(string[] coordList, Bitmap img)
+        public unsafe static Bitmap Clip(string rawUrl, Bitmap img)
         {
+            var url = rawUrl.Split('/');
+            var coordList = url[3].Split(','); 
+
             long polygonX0 = 0;
             long polygonWeight = 0;
             long polygonY0 = 0;

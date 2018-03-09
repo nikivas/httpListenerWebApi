@@ -49,6 +49,7 @@
     <Compile Include="Clipers\BitmapCliper.cs" />
     <Compile Include="ContextFilter.cs" />
     <Compile Include="EntryPoint.cs" />
+    <Compile Include="Filters\FilterBuilder.cs" />
     <Compile Include="Filters\FilterFlipV.cs" />
     <Compile Include="Filters\FilterRotateCW.cs" />
     <Compile Include="Filters\FilterRotateCCW.cs" />

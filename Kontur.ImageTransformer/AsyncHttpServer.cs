@@ -108,59 +108,37 @@ namespace Kontur.ImageTransformer
         }
 
 
-        private IFilter urlParse(string[] url)
-        {
-            if (url[1] != @"process")
-                return null;
-            else if (!Regex.IsMatch(url[3], @"^ *(-?[0-9]*,){3}-?[0-9]* *$"))
-                return null;
-
-            url[2] = url[2].ToLower();
-
-            if(url[2] == @"rotate-cw")
-                return new FilterRotateCW();
-
-            else if (url[2] == @"rotate-ccw")
-                return new FilterRotateCCW();
-
-            else if (url[2] == @"flip-h")
-                return new FilterFlipH();
-
-            else if (url[2] == @"flip-v")
-                return new FilterFlipV();
-                
-
-            return null;
-        }
+       
 
         #region<Testing>
-        private void TestHandleContextAsync(object arg)
-        {
-            var canceller = new CancellationTokenSource();
-            canceller.CancelAfter(1000);
-            var listenerContext = (HttpListenerContext)arg;
-            var streamIn = listenerContext.Request.InputStream;
-            var encoding = listenerContext.Request.ContentEncoding;
-            var reader = new StreamReader(streamIn, encoding);
-            listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
+        //private void TestHandleContextAsync(object arg)
+        //{
+        //    var canceller = new CancellationTokenSource();
+        //    canceller.CancelAfter(1000);
+        //    var listenerContext = (HttpListenerContext)arg;
+        //    var streamIn = listenerContext.Request.InputStream;
+        //    var encoding = listenerContext.Request.ContentEncoding;
+        //    var reader = new StreamReader(streamIn, encoding);
+        //    listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
             
-            Thread.Sleep(90);
-            var res = reader.ReadToEnd();
-            int a;
-            int b;
-            ThreadPool.GetAvailableThreads(out a, out b);
-            //Console.WriteLine("workerThread - {0}, competitionPort - {1}",a,b);
+        //    Thread.Sleep(90);
+        //    var res = reader.ReadToEnd();
+        //    int a;
+        //    int b;
+        //    ThreadPool.GetAvailableThreads(out a, out b);
+        //    //Console.WriteLine("workerThread - {0}, competitionPort - {1}",a,b);
 
-            using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
-            {
-                writer.Write(res);
-            }
-            avalibleConnection--;
-        }
+        //    using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
+        //    {
+        //        writer.Write(res);
+        //    }
+        //    avalibleConnection--;
+        //}
         #endregion
 
         private void BadRequest(HttpListenerContext listenerContext, int httpStatusCode)
         {
+            --avalibleConnection;
             listenerContext.Response.StatusCode = httpStatusCode;
             listenerContext.Response.Close();
             return;
@@ -169,65 +147,40 @@ namespace Kontur.ImageTransformer
         private async void HandleContextAsync(object arg)
         {
             var listenerContext = (HttpListenerContext)arg;
-            
-
-            var url = listenerContext.Request.RawUrl.Split('/');
-            var urlParseResult = urlParse(url);
-            if (urlParseResult == null)
+            try
             {
-                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
-                --avalibleConnection;
-                return;
-            }
-            var streamIn = listenerContext.Request.InputStream;
-            var encoding = listenerContext.Request.ContentEncoding;
-            var reader = new StreamReader(streamIn, encoding);
-            Bitmap img = null;
-            try {
-                
-                img = new Bitmap(streamIn);
-
-            }catch(Exception ee)
-            {
-                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
-                --avalibleConnection;
-                return;
-            }
+                var urlParseResult = FilterBuilder.urlParse(listenerContext.Request.RawUrl);
             
-            if (img.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
-            {
-                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
-                --avalibleConnection;
-                return;
-            }
+                var streamIn = listenerContext.Request.InputStream;
+                var encoding = listenerContext.Request.ContentEncoding;
+                var reader = new StreamReader(streamIn, encoding);
 
-            
-            string[] coordList = url[3].Split(',');
-            Bitmap resultImage = null;
-            try {
+                Bitmap img = new Bitmap(streamIn);
+                if (!ContextFilter.IsContextCorrect(img, listenerContext)) { 
+                    throw new NotImplementedException();
+                }
+
+                Bitmap resultImage = null;
                 urlParseResult.draw(img);
-                resultImage = BitmapCliper.Clip(coordList, img);
-            } catch(Exception ee)
-            {
+                try {
+                    resultImage = BitmapCliper.Clip(listenerContext.Request.RawUrl, img);
+                } catch(Exception ee)
+                {
+                    BadRequest(listenerContext, (int)HttpStatusCode.NoContent);
+                    return;
+                }
+                listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
+                using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
+                {
+                    resultImage.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
+                }
                 --avalibleConnection;
-                BadRequest(listenerContext, (int)HttpStatusCode.NoContent);
-                return;
             }
-            if (resultImage == null)
+            catch(Exception ee)
             {
-                --avalibleConnection;
                 BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
                 return;
             }
-
-            listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
-            Console.WriteLine(resultImage.Width);
-            Console.WriteLine(resultImage.Height);
-            using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
-            {
-                resultImage.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
-            }
-            --avalibleConnection;
         }
 
         private readonly HttpListener listener;

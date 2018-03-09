@@ -80,17 +80,17 @@ namespace Kontur.ImageTransformer
                         //ConcurrentStack<HttpListenerContext> el = new ConcurrentStack<HttpListenerContext>();
                         var context = listener.GetContext();
                         //Console.WriteLine(avalibleConnection);
-                        if (avalibleConnection > 150)
+                        if (avalibleConnection > maxThreads)
                         {
-                            context.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                            context.Response.StatusCode = 429;
                             context.Response.Close();
                             continue;
                         }
                         else
                         {
                             ++avalibleConnection;
-                            //ThreadPool.QueueUserWorkItem(HandleContextAsync, context);
-                            Task.Run(() => HandleContextAsync(context));
+                            ThreadPool.QueueUserWorkItem(HandleContextAsync, context);
+                            //Task.Run(() => HandleContextAsync(context));
                         }
 
                     }
@@ -112,27 +112,22 @@ namespace Kontur.ImageTransformer
         {
             if (url[1] != @"process")
                 return null;
-            else if (!Regex.IsMatch(url[3], @"^([0-9,-]*,){3}[0-9,-]*$"))
+            else if (!Regex.IsMatch(url[3], @"^ *(-?[0-9]*,){3}-?[0-9]* *$"))
                 return null;
 
-            if(url[2] == @"grayscale")
-                return new FilterGrayScale();
+            url[2] = url[2].ToLower();
 
-            else if (url[2] == @"sepia")
-                return new FilterSepia();
+            if(url[2] == @"rotate-cw")
+                return new FilterRotateCW();
 
-            else if (Regex.IsMatch(url[2], @"^threshold\(\d*\)$"))
-            {
-                var el = new FilterThreshold();
-                Console.WriteLine("in");
-                
-                var valueString = Regex.Match(url[2], @"\(\d*\)").Value;
-                Console.WriteLine(valueString);
-                var valueNumber = int.Parse(valueString.Substring(1, valueString.Length - 2));
+            else if (url[2] == @"rotate-ccw")
+                return new FilterRotateCCW();
 
-                el.value = valueNumber;
-                return el;
-            }
+            else if (url[2] == @"flip-h")
+                return new FilterFlipH();
+
+            else if (url[2] == @"flip-v")
+                return new FilterFlipV();
                 
 
             return null;
@@ -171,74 +166,63 @@ namespace Kontur.ImageTransformer
             return;
         }
 
-        private async Task HandleContextAsync(HttpListenerContext listenerContext)
+        private async void HandleContextAsync(object arg)
         {
-            //var canceller = new CancellationTokenSource();
-            //canceller.CancelAfter(maxTimeResponce);
+            var listenerContext = (HttpListenerContext)arg;
+            
+
             var url = listenerContext.Request.RawUrl.Split('/');
             var urlParseResult = urlParse(url);
             if (urlParseResult == null)
             {
                 BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
+                --avalibleConnection;
+                return;
             }
             var streamIn = listenerContext.Request.InputStream;
             var encoding = listenerContext.Request.ContentEncoding;
             var reader = new StreamReader(streamIn, encoding);
-
             Bitmap img = null;
-            try { 
-
+            try {
+                
                 img = new Bitmap(streamIn);
 
             }catch(Exception ee)
             {
                 BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
+                --avalibleConnection;
+                return;
+            }
+            
+            if (img.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+            {
+                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
+                --avalibleConnection;
                 return;
             }
 
-            int imageWidth = img.Width;
-            int imageHeight = img.Height;
-
-            // TODO обрабатывать прямоугольник картинки правильно
-            // TODO убедиться в распараллеливании и устойчивости сервера к нагрузке
             
             string[] coordList = url[3].Split(',');
-            long polygonX0 = 0;
-            long polygonWeight = 0;
-            long polygonY0 = 0;
-            long polygonHeight = 0;
-            if( !Int64.TryParse(coordList[0], out polygonX0) || !Int64.TryParse(coordList[1], out polygonY0) ||
-                !Int64.TryParse(coordList[2], out polygonWeight) || !Int64.TryParse(coordList[3], out polygonHeight))
+            Bitmap resultImage = null;
+            try {
+                urlParseResult.draw(img);
+                resultImage = BitmapCliper.Clip(coordList, img);
+            } catch(Exception ee)
             {
-                BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
-            }
-
-            long polygonX1 = polygonWeight + polygonX0;
-            long polygonY1 = polygonHeight + polygonY0;
-            BitmapCliper.getCorrectCoords(ref img, ref polygonX0, ref polygonY0, ref polygonX1, ref polygonY1);
-
-            long resultImageHeight = Math.Abs(polygonY1 - polygonY0);
-            long resultImageWidth = Math.Abs(polygonX1 - polygonX0);
-
-            if(resultImageHeight == 0 && resultImageWidth == 0)
-            {
+                --avalibleConnection;
                 BadRequest(listenerContext, (int)HttpStatusCode.NoContent);
                 return;
             }
-            Int64 resultImagePointX0 = Math.Min(polygonX0, polygonX1);
-            Int64 resultImagePointY0 = Math.Min(polygonY0, polygonY1);
-            if(img.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+            if (resultImage == null)
             {
+                --avalibleConnection;
                 BadRequest(listenerContext, (int)HttpStatusCode.BadRequest);
                 return;
             }
 
-            
-            var resultImage = BitmapCliper.Clip(img, (int) resultImagePointX0, (int) resultImagePointY0, 
-                                                (int) resultImageWidth, (int) resultImageHeight, urlParseResult); 
-
             listenerContext.Response.StatusCode = (int)HttpStatusCode.OK;
-
+            Console.WriteLine(resultImage.Width);
+            Console.WriteLine(resultImage.Height);
             using (var writer = new StreamWriter(listenerContext.Response.OutputStream, encoding))
             {
                 resultImage.Save(listenerContext.Response.OutputStream, System.Drawing.Imaging.ImageFormat.Png );
@@ -253,5 +237,6 @@ namespace Kontur.ImageTransformer
         private volatile bool isRunning;
         private int avalibleConnection;
         public int maxTimeResponce = 1000;
+        public int maxThreads = 150;
     }
 }

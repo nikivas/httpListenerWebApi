@@ -4,6 +4,6 @@ namespace Kontur.ImageTransformer
 {
     interface IFilter
     {
-        void draw(ref point pnt );   
+        void draw(Bitmap pnt );   
     }
 }
